@@ -28,6 +28,6 @@ func main() {
 
 	var wx weather
 	wx.temp = fmt.Sprintf("%v", data["current_condition"].([]interface{})[0].(map[string]interface{})["temp_C"])
-	wx.likeFeels = fmt.Sprintf("%v", data["current_condition"].([]interface{})[0].(map[string]interface{})["FeelsLikeF"])
+	wx.likeFeels = fmt.Sprintf("%v", data["current_condition"].([]interface{})[0].(map[string]interface{})["FeelsLikeC"])
 	fmt.Printf("%v(%v)", wx.temp, wx.likeFeels)
 }
