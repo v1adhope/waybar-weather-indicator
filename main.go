@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 )
 
 const city = "Penza"
@@ -18,16 +19,34 @@ type weather struct {
 func main() {
 	uri := fmt.Sprintf("https://wttr.in/%s?format=j1", city)
 
-	resp, err := http.Get(uri)
+	var (
+		resp *http.Response
+		err  error
+
+		attempts = 3
+	)
+
+	//NOTE: If the server temporarily does not respond
+	for attempts > 0 {
+		resp, err = http.Get(uri)
+		if err == nil {
+			break
+		}
+
+		log.Printf("attempts left: %d", attempts)
+		time.Sleep(10 * time.Second)
+
+		attempts--
+	}
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("request failed: %s", err)
 	}
 	defer resp.Body.Close()
 
 	var data map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("could not decode: %s", err)
 	}
 
 	var w weather
@@ -38,7 +57,7 @@ func main() {
 	w.Tooltip += fmt.Sprintf("Current temperature: %s°\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["temp_C"])
 	w.Tooltip += fmt.Sprintf("Feels like: %s°\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["FeelsLikeC"])
 	w.Tooltip += fmt.Sprintf("Humidity: %s%%\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["humidity"])
-	w.Tooltip += fmt.Sprintf("Pressure: %s kPa\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["pressure"])
+	w.Tooltip += fmt.Sprintf("Pressure: %s hPa\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["pressure"])
 	w.Tooltip += fmt.Sprintf("Wind speed: %s Km/h\n\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["windspeedKmph"])
 
 	w.Tooltip += fmt.Sprintf("<b>Solar cycle</b>\n")
