@@ -10,6 +10,7 @@ import (
 
 const city = "Penza"
 
+// NOTE: Output structure. Read more
 // https://github.com/Alexays/Waybar/wiki/Module:-Custom#return-type
 type weather struct {
 	Text    string `json:"text"`
@@ -23,7 +24,7 @@ func main() {
 		resp *http.Response
 		err  error
 
-		attempts = 3
+		attempts = 5
 	)
 
 	//NOTE: If the server temporarily does not respond
@@ -34,7 +35,7 @@ func main() {
 		}
 
 		log.Printf("attempts left: %d", attempts)
-		time.Sleep(10 * time.Second)
+		time.Sleep(1 * time.Minute)
 
 		attempts--
 	}
