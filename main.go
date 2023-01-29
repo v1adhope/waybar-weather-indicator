@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
-const city = "Penza"
+const _city = "Penza"
+const _errorMsg = `{"text": "error"}`
 
 // NOTE: Output structure. Read more
 // https://github.com/Alexays/Waybar/wiki/Module:-Custom#return-type
@@ -18,7 +20,7 @@ type weather struct {
 }
 
 func main() {
-	uri := fmt.Sprintf("https://wttr.in/%s?format=j1", city)
+	uri := fmt.Sprintf("https://wttr.in/%s?format=j1", _city)
 
 	var (
 		resp *http.Response
@@ -27,19 +29,19 @@ func main() {
 		attempts = 5
 	)
 
-	//NOTE: If the server temporarily does not respond
-	for attempts > 0 {
+	for attempts > 0 { //If the server temporarily does not respond
 		resp, err = http.Get(uri)
 		if err == nil {
 			break
 		}
 
-		log.Printf("attempts left: %d", attempts)
+		// log.Printf("attempts left: %d", attempts) //Only for debug
 		time.Sleep(1 * time.Minute)
 
 		attempts--
 	}
 	if err != nil {
+		fmt.Println(_errorMsg)
 		log.Fatalf("request failed: %s", err)
 	}
 	defer resp.Body.Close()
@@ -47,15 +49,17 @@ func main() {
 	var data map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	if err != nil {
+		fmt.Println(_errorMsg)
 		log.Fatalf("could not decode: %s", err)
 	}
 
 	var w weather
+
 	w.Text = fmt.Sprintf("%s°", data["current_condition"].([]interface{})[0].(map[string]interface{})["temp_C"])
 	w.Text += fmt.Sprintf("(%s°)", data["current_condition"].([]interface{})[0].(map[string]interface{})["FeelsLikeC"])
 
 	w.Tooltip = fmt.Sprintf("<b>Weather</b>\n")
-	w.Tooltip += fmt.Sprintf("Current temperature: %s°\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["temp_C"])
+	w.Tooltip += fmt.Sprintf("Current temp: %s°\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["temp_C"])
 	w.Tooltip += fmt.Sprintf("Feels like: %s°\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["FeelsLikeC"])
 	w.Tooltip += fmt.Sprintf("Humidity: %s%%\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["humidity"])
 	w.Tooltip += fmt.Sprintf("Pressure: %s hPa\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["pressure"])
@@ -65,9 +69,46 @@ func main() {
 	w.Tooltip += fmt.Sprintf("Sunrise at %s\n", data["weather"].([]interface{})[0].(map[string]interface{})["astronomy"].([]interface{})[0].(map[string]interface{})["sunrise"])
 	w.Tooltip += fmt.Sprintf("Sunset at %s", data["weather"].([]interface{})[0].(map[string]interface{})["astronomy"].([]interface{})[0].(map[string]interface{})["sunset"])
 
+	w.Tooltip += fmt.Sprint("\n")
+	weatherDays := 3
+
+	hours := time.Now().Hour()
+
+	for i := 0; i < weatherDays; i++ {
+		switch i {
+		case 0:
+			w.Tooltip += fmt.Sprint("\n<b>Today</b>\n")
+		case 1:
+			w.Tooltip += fmt.Sprint("\n<b>Tomorrow</b>\n")
+		case 2:
+			w.Tooltip += fmt.Sprint("\n<b>After a day</b>\n")
+		}
+
+		for k := range data["weather"].([]interface{})[i].(map[string]interface{})["hourly"].([]interface{}) {
+			wttrTime := k * 3 // Conversion into hours
+
+			if hours > wttrTime+2 && i == 0 { // Exit if the watch is overdue
+				continue
+			}
+
+			temp := data["weather"].([]interface{})[i].(map[string]interface{})["hourly"].([]interface{})[k].(map[string]interface{})["tempC"]
+			feelsLike := data["weather"].([]interface{})[i].(map[string]interface{})["hourly"].([]interface{})[k].(map[string]interface{})["FeelsLikeC"]
+
+			if wttrTime < 10 {
+				w.Tooltip += fmt.Sprintf("At 0%d:00 %s°(%s°)\n", wttrTime, temp, feelsLike)
+			} else {
+				w.Tooltip += fmt.Sprintf("At %d:00 %s°(%s°)\n", wttrTime, temp, feelsLike)
+			}
+		}
+	}
+
+	w.Tooltip = strings.TrimSuffix(w.Tooltip, "\n")
+
 	jsonOut, err := json.Marshal(w)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(_errorMsg)
+		log.Fatalf("could not encode: %s", err)
 	}
+
 	fmt.Print(string(jsonOut))
 }
