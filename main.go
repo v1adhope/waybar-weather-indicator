@@ -9,12 +9,15 @@ import (
 	"time"
 )
 
-const _city = "Penza"
-const _errorMsg = `{"text": "error"}`
+const (
+	_city         = "Penza"
+	_timeModel24h = "15:04"
+	_timeModel12h = "03:04PM"
+)
 
 // NOTE: Output structure. Read more
 // https://github.com/Alexays/Waybar/wiki/Module:-Custom#return-type
-type weather struct {
+type waybar struct {
 	Text    string `json:"text"`
 	Tooltip string `json:"tooltip"`
 }
@@ -35,13 +38,12 @@ func main() {
 			break
 		}
 
-		// log.Printf("attempts left: %d", attempts) //Only for debug
+		log.Printf("attempts left: %d", attempts)
 		time.Sleep(1 * time.Minute)
 
 		attempts--
 	}
 	if err != nil {
-		fmt.Println(_errorMsg)
 		log.Fatalf("request failed: %s", err)
 	}
 	defer resp.Body.Close()
@@ -49,12 +51,12 @@ func main() {
 	var data map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	if err != nil {
-		fmt.Println(_errorMsg)
 		log.Fatalf("could not decode: %s", err)
 	}
 
-	var w weather
+	var w waybar
 
+	// Current weather block
 	w.Text = fmt.Sprintf("%s°", data["current_condition"].([]interface{})[0].(map[string]interface{})["temp_C"])
 	w.Text += fmt.Sprintf("(%s°)", data["current_condition"].([]interface{})[0].(map[string]interface{})["FeelsLikeC"])
 
@@ -65,10 +67,24 @@ func main() {
 	w.Tooltip += fmt.Sprintf("Pressure: %s hPa\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["pressure"])
 	w.Tooltip += fmt.Sprintf("Wind speed: %s Km/h\n\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["windspeedKmph"])
 
-	w.Tooltip += fmt.Sprintf("<b>Solar cycle</b>\n")
-	w.Tooltip += fmt.Sprintf("Sunrise at %s\n", data["weather"].([]interface{})[0].(map[string]interface{})["astronomy"].([]interface{})[0].(map[string]interface{})["sunrise"])
-	w.Tooltip += fmt.Sprintf("Sunset at %s", data["weather"].([]interface{})[0].(map[string]interface{})["astronomy"].([]interface{})[0].(map[string]interface{})["sunset"])
+	// Solar block
+	notProcessedTime := data["weather"].([]interface{})[0].(map[string]interface{})["astronomy"].([]interface{})[0].(map[string]interface{})["sunrise"].(string)
+	sunriseTime, err := timeConvert(notProcessedTime)
+	if err != nil {
+		log.Fatalf("could not convert time: %s", err)
+	}
 
+	notProcessedTime = data["weather"].([]interface{})[0].(map[string]interface{})["astronomy"].([]interface{})[0].(map[string]interface{})["sunset"].(string)
+	sunsetTime, err := timeConvert(notProcessedTime)
+	if err != nil {
+		log.Fatalf("could not convert time: %s", err)
+	}
+
+	w.Tooltip += fmt.Sprintf("<b>Solar cycle</b>\n")
+	w.Tooltip += fmt.Sprintf("Sunrise at %s\n", sunriseTime)
+	w.Tooltip += fmt.Sprintf("Sunset at %s", sunsetTime)
+
+	// 3 days weather block
 	w.Tooltip += fmt.Sprint("\n")
 	weatherDays := 3
 
@@ -106,9 +122,19 @@ func main() {
 
 	jsonOut, err := json.Marshal(w)
 	if err != nil {
-		fmt.Println(_errorMsg)
 		log.Fatalf("could not encode: %s", err)
 	}
 
 	fmt.Print(string(jsonOut))
+}
+
+func timeConvert(target string) (string, error) {
+	target = strings.ReplaceAll(target, " ", "")
+
+	normalTime, err := time.Parse(_timeModel12h, target)
+	if err != nil {
+		return "", fmt.Errorf("could not convert time: %s", err)
+	}
+
+	return normalTime.Format(_timeModel24h), nil
 }
