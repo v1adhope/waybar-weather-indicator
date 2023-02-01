@@ -107,8 +107,18 @@ func main() {
 				continue
 			}
 
-			temp := data["weather"].([]interface{})[i].(map[string]interface{})["hourly"].([]interface{})[k].(map[string]interface{})["tempC"]
-			feelsLike := data["weather"].([]interface{})[i].(map[string]interface{})["hourly"].([]interface{})[k].(map[string]interface{})["FeelsLikeC"]
+			temp := data["weather"].([]interface{})[i].(map[string]interface{})["hourly"].([]interface{})[k].(map[string]interface{})["tempC"].(string)
+			feelsLike := data["weather"].([]interface{})[i].(map[string]interface{})["hourly"].([]interface{})[k].(map[string]interface{})["FeelsLikeC"].(string)
+
+			temp, err = alignment(temp)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			feelsLike, err = alignment(feelsLike)
+			if err != nil {
+				log.Fatal(err)
+			}
 
 			if wttrTime < 10 {
 				w.Tooltip += fmt.Sprintf("At 0%d:00 %s°(%s°)\n", wttrTime, temp, feelsLike)
@@ -120,12 +130,12 @@ func main() {
 
 	w.Tooltip = strings.TrimSuffix(w.Tooltip, "\n")
 
-	jsonOut, err := json.Marshal(w)
+	json, err := json.Marshal(w)
 	if err != nil {
 		log.Fatalf("could not encode: %s", err)
 	}
 
-	fmt.Print(string(jsonOut))
+	fmt.Print(string(json))
 }
 
 func timeConvert(target string) (string, error) {
@@ -137,4 +147,17 @@ func timeConvert(target string) (string, error) {
 	}
 
 	return normalTime.Format(_timeModel24h), nil
+}
+
+func alignment(target string) (string, error) {
+	switch len(target) {
+	default:
+		return "", fmt.Errorf("bad data")
+	case 1:
+		return fmt.Sprintf("  %s", target), nil
+	case 2:
+		return fmt.Sprintf(" %s", target), nil
+	case 3:
+		return target, nil
+	}
 }
