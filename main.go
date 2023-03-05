@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
 
 const (
-	_city         = "Penza"
 	_timeModel24h = "15:04"
 	_timeModel12h = "03:04PM"
 )
@@ -23,7 +23,13 @@ type waybar struct {
 }
 
 func main() {
-	uri := fmt.Sprintf("https://wttr.in/%s?format=j1", _city)
+	var city = "" // use ip location by default
+
+	if envCity := os.Getenv("CITY_WEATHER"); envCity != "" {
+		city = envCity
+	}
+
+	uri := fmt.Sprintf("https://wttr.in/%s?format=j1", city)
 
 	var (
 		resp *http.Response
@@ -39,7 +45,7 @@ func main() {
 		}
 
 		log.Printf("attempts left: %d", attempts)
-		time.Sleep(1 * time.Minute)
+		time.Sleep(time.Minute)
 
 		attempts--
 	}
