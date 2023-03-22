@@ -8,4 +8,4 @@ run: build
 	./.bin/weather
 
 build:
-	go build -o .bin/weather
+	go build -o .bin/weather cmd/main.go

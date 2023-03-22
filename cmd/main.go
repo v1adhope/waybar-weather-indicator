@@ -11,8 +11,8 @@ import (
 )
 
 const (
+	_timeModel12h = "03:04 PM"
 	_timeModel24h = "15:04"
-	_timeModel12h = "03:04PM"
 )
 
 // NOTE: Output structure. Read more
@@ -34,20 +34,17 @@ func main() {
 	var (
 		resp *http.Response
 		err  error
-
-		attempts = 5
 	)
 
-	for attempts > 0 { //If the server temporarily does not respond
+	//If the server temporarily does not respond
+	for attempts := 5; attempts > 0; attempts-- {
 		resp, err = http.Get(uri)
-		if err == nil {
+		if attempts == 1 || err == nil {
 			break
 		}
 
-		log.Printf("attempts left: %d", attempts)
+		log.Printf("attempts left: %d", attempts-1)
 		time.Sleep(time.Minute)
-
-		attempts--
 	}
 	if err != nil {
 		log.Fatalf("request failed: %s", err)
@@ -60,18 +57,23 @@ func main() {
 		log.Fatalf("could not decode: %s", err)
 	}
 
-	var w waybar
+	var (
+		w waybar
+		b strings.Builder
+	)
 
 	// Current weather block
-	w.Text = fmt.Sprintf("%s°", data["current_condition"].([]interface{})[0].(map[string]interface{})["temp_C"])
-	w.Text += fmt.Sprintf("(%s°)", data["current_condition"].([]interface{})[0].(map[string]interface{})["FeelsLikeC"])
+	fmt.Fprintf(&b, "%s°", data["current_condition"].([]interface{})[0].(map[string]interface{})["temp_C"])
+	fmt.Fprintf(&b, "(%s°)", data["current_condition"].([]interface{})[0].(map[string]interface{})["FeelsLikeC"])
+	w.Text = b.String()
+	b.Reset()
 
-	w.Tooltip = fmt.Sprintf("<b>Weather</b>\n")
-	w.Tooltip += fmt.Sprintf("Current temp: %s°\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["temp_C"])
-	w.Tooltip += fmt.Sprintf("Feels like: %s°\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["FeelsLikeC"])
-	w.Tooltip += fmt.Sprintf("Humidity: %s%%\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["humidity"])
-	w.Tooltip += fmt.Sprintf("Pressure: %s hPa\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["pressure"])
-	w.Tooltip += fmt.Sprintf("Wind speed: %s Km/h\n\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["windspeedKmph"])
+	fmt.Fprintf(&b, "<b>Weather</b>\n")
+	fmt.Fprintf(&b, "Current temp: %s°\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["temp_C"])
+	fmt.Fprintf(&b, "Feels like: %s°\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["FeelsLikeC"])
+	fmt.Fprintf(&b, "Humidity: %s%%\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["humidity"])
+	fmt.Fprintf(&b, "Pressure: %s hPa\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["pressure"])
+	fmt.Fprintf(&b, "Wind speed: %s Km/h\n\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["windspeedKmph"])
 
 	// Solar block
 	notProcessedTime := data["weather"].([]interface{})[0].(map[string]interface{})["astronomy"].([]interface{})[0].(map[string]interface{})["sunrise"].(string)
@@ -86,12 +88,12 @@ func main() {
 		log.Fatalf("could not convert time: %s", err)
 	}
 
-	w.Tooltip += fmt.Sprintf("<b>Solar cycle</b>\n")
-	w.Tooltip += fmt.Sprintf("Sunrise at %s\n", sunriseTime)
-	w.Tooltip += fmt.Sprintf("Sunset at %s", sunsetTime)
+	fmt.Fprintf(&b, "<b>Solar cycle</b>\n")
+	fmt.Fprintf(&b, "Sunrise at %s\n", sunriseTime)
+	fmt.Fprintf(&b, "<b>Solar cycle</b>\n")
+	fmt.Fprintf(&b, "Sunset at %s\n", sunsetTime)
 
 	// 3 days weather block
-	w.Tooltip += fmt.Sprint("\n")
 	weatherDays := 3
 
 	hours := time.Now().Hour()
@@ -99,11 +101,11 @@ func main() {
 	for i := 0; i < weatherDays; i++ {
 		switch i {
 		case 0:
-			w.Tooltip += fmt.Sprint("\n<b>Today</b>\n")
+			fmt.Fprintf(&b, "\n<b>Today</b>\n")
 		case 1:
-			w.Tooltip += fmt.Sprint("\n<b>Tomorrow</b>\n")
+			fmt.Fprintf(&b, "\n<b>Tomorrow</b>\n")
 		case 2:
-			w.Tooltip += fmt.Sprint("\n<b>After a day</b>\n")
+			fmt.Fprintf(&b, "\n<b>After a day</b>\n")
 		}
 
 		for k := range data["weather"].([]interface{})[i].(map[string]interface{})["hourly"].([]interface{}) {
@@ -127,14 +129,14 @@ func main() {
 			}
 
 			if wttrTime < 10 {
-				w.Tooltip += fmt.Sprintf("At 0%d:00 %s°(%s°)\n", wttrTime, temp, feelsLike)
+				fmt.Fprintf(&b, "At 0%d:00 %s°(%s°)\n", wttrTime, temp, feelsLike)
 			} else {
-				w.Tooltip += fmt.Sprintf("At %d:00 %s°(%s°)\n", wttrTime, temp, feelsLike)
+				fmt.Fprintf(&b, "At %d:00 %s°(%s°)\n", wttrTime, temp, feelsLike)
 			}
 		}
 	}
 
-	w.Tooltip = strings.TrimSuffix(w.Tooltip, "\n")
+	w.Tooltip = strings.TrimSuffix(b.String(), "\n")
 
 	json, err := json.Marshal(w)
 	if err != nil {
@@ -145,14 +147,12 @@ func main() {
 }
 
 func timeConvert(target string) (string, error) {
-	target = strings.ReplaceAll(target, " ", "")
-
-	normalTime, err := time.Parse(_timeModel12h, target)
+	time, err := time.Parse(_timeModel12h, target)
 	if err != nil {
-		return "", fmt.Errorf("could not convert time: %s", err)
+		return "", err
 	}
 
-	return normalTime.Format(_timeModel24h), nil
+	return time.Format(_timeModel24h), nil
 }
 
 func alignment(target string) (string, error) {
@@ -160,9 +160,9 @@ func alignment(target string) (string, error) {
 	default:
 		return "", fmt.Errorf("bad data")
 	case 1:
-		return fmt.Sprintf("  %s", target), nil
-	case 2:
 		return fmt.Sprintf(" %s", target), nil
+	case 2:
+		return fmt.Sprintf("%s", target), nil
 	case 3:
 		return target, nil
 	}
