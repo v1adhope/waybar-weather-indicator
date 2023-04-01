@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -29,16 +30,20 @@ func main() {
 		city = envCity
 	}
 
-	uri := fmt.Sprintf("https://wttr.in/%s?format=j1", city)
-
 	var (
 		resp *http.Response
 		err  error
+		u    *url.URL
 	)
+
+	u, err = url.Parse(fmt.Sprintf("https://wttr.in/%s?format=j1", city))
+	if err != nil {
+		log.Fatalf("parse failed: %s", err)
+	}
 
 	//If the server temporarily does not respond
 	for attempts := 5; attempts > 0; attempts-- {
-		resp, err = http.Get(uri)
+		resp, err = http.Get(u.String())
 		if attempts == 1 || err == nil {
 			break
 		}
@@ -90,7 +95,6 @@ func main() {
 
 	fmt.Fprintf(&b, "<b>Solar cycle</b>\n")
 	fmt.Fprintf(&b, "Sunrise at %s\n", sunriseTime)
-	fmt.Fprintf(&b, "<b>Solar cycle</b>\n")
 	fmt.Fprintf(&b, "Sunset at %s\n", sunsetTime)
 
 	// 3 days weather block
