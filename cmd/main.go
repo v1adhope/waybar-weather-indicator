@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/v1adhope/waybar-weather-indicator/wttrstruct"
 )
 
 const (
@@ -56,7 +58,7 @@ func main() {
 	}
 	defer resp.Body.Close()
 
-	var data map[string]interface{}
+	var data wttrstruct.Data
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	if err != nil {
 		log.Fatalf("could not decode: %s", err)
@@ -68,26 +70,26 @@ func main() {
 	)
 
 	// Current weather block
-	fmt.Fprintf(&b, "%s°", data["current_condition"].([]interface{})[0].(map[string]interface{})["temp_C"])
-	fmt.Fprintf(&b, "(%s°)", data["current_condition"].([]interface{})[0].(map[string]interface{})["FeelsLikeC"])
+	fmt.Fprintf(&b, "%s°", data.CurrentCondition[0].TempC)
+	fmt.Fprintf(&b, "(%s°)", data.CurrentCondition[0].FeelsLikeC)
 	w.Text = b.String()
 	b.Reset()
 
 	fmt.Fprintf(&b, "<b>Weather</b>\n")
-	fmt.Fprintf(&b, "Current temp: %s°\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["temp_C"])
-	fmt.Fprintf(&b, "Feels like: %s°\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["FeelsLikeC"])
-	fmt.Fprintf(&b, "Humidity: %s%%\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["humidity"])
-	fmt.Fprintf(&b, "Pressure: %s hPa\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["pressure"])
-	fmt.Fprintf(&b, "Wind speed: %s Km/h\n\n", data["current_condition"].([]interface{})[0].(map[string]interface{})["windspeedKmph"])
+	fmt.Fprintf(&b, "Current temp: %s°\n", data.CurrentCondition[0].TempC)
+	fmt.Fprintf(&b, "Feels like: %s°\n", data.CurrentCondition[0].FeelsLikeC)
+	fmt.Fprintf(&b, "Humidity: %s%%\n", data.CurrentCondition[0].Humidity)
+	fmt.Fprintf(&b, "Pressure: %s hPa\n", data.CurrentCondition[0].Pressure)
+	fmt.Fprintf(&b, "Wind speed: %s Km/h\n\n", data.CurrentCondition[0].WindspeedKmph)
 
 	// Solar block
-	notProcessedTime := data["weather"].([]interface{})[0].(map[string]interface{})["astronomy"].([]interface{})[0].(map[string]interface{})["sunrise"].(string)
+	notProcessedTime := data.Weather[0].Astronomy[0].SunRise
 	sunriseTime, err := timeConvert(notProcessedTime)
 	if err != nil {
 		log.Fatalf("could not convert time: %s", err)
 	}
 
-	notProcessedTime = data["weather"].([]interface{})[0].(map[string]interface{})["astronomy"].([]interface{})[0].(map[string]interface{})["sunset"].(string)
+	notProcessedTime = data.Weather[0].Astronomy[0].SunSet
 	sunsetTime, err := timeConvert(notProcessedTime)
 	if err != nil {
 		log.Fatalf("could not convert time: %s", err)
@@ -112,16 +114,15 @@ func main() {
 			fmt.Fprintf(&b, "\n<b>After a day</b>\n")
 		}
 
-		for k := range data["weather"].([]interface{})[i].(map[string]interface{})["hourly"].([]interface{}) {
+		for k, v := range data.Weather[i].Hourly {
 			wttrTime := k * 3 // Conversion into hours
 
 			if hours > wttrTime+2 && i == 0 { // Exit if the watch is overdue
 				continue
 			}
 
-			temp := data["weather"].([]interface{})[i].(map[string]interface{})["hourly"].([]interface{})[k].(map[string]interface{})["tempC"].(string)
-			feelsLike := data["weather"].([]interface{})[i].(map[string]interface{})["hourly"].([]interface{})[k].(map[string]interface{})["FeelsLikeC"].(string)
-
+			temp := v.TempC
+			feelsLike := v.FeelsLikeC
 			temp, err = alignment(temp)
 			if err != nil {
 				log.Fatal(err)
