@@ -1,6 +1,12 @@
-# Sample
+# Usage
 
-Updated every 30 minutes. By default used ip location, set CITY_WEATHER os env or city's variable to override. CITY_WEATHER has the highest priority.
+The indicator uses [wttr API](https://github.com/chubin/wttr.in)
+
+By default used ip location. Set the environment variable `CITY_WEATHER` to override.
+
+## Sample
+
+Updated every 30 minutes.
 
 ```
 "custom/weather": {
