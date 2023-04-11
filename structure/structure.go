@@ -1,4 +1,4 @@
-package wttrstruct
+package structure
 
 type Data struct {
 	CurrentCondition []struct {
