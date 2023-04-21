@@ -83,14 +83,14 @@ func main() {
 	fmt.Fprintf(&b, "Wind speed: %s Km/h\n\n", data.CurrentCondition[0].WindspeedKmph)
 
 	// Solar block
-	notProcessedTime := data.Weather[0].Astronomy[0].SunRise
-	sunriseTime, err := timeConvert(notProcessedTime)
+	time12H := data.Weather[0].Astronomy[0].SunRise
+	sunriseTime, err := timeConvertFrom12to24H(time12H)
 	if err != nil {
 		log.Fatalf("could not convert time: %s", err)
 	}
 
-	notProcessedTime = data.Weather[0].Astronomy[0].SunSet
-	sunsetTime, err := timeConvert(notProcessedTime)
+	time12H = data.Weather[0].Astronomy[0].SunSet
+	sunsetTime, err := timeConvertFrom12to24H(time12H)
 	if err != nil {
 		log.Fatalf("could not convert time: %s", err)
 	}
@@ -137,7 +137,7 @@ func main() {
 	fmt.Print(string(json))
 }
 
-func timeConvert(target string) (string, error) {
+func timeConvertFrom12to24H(target string) (string, error) {
 	time, err := time.Parse(_timeModel12h, target)
 	if err != nil {
 		return "", err
