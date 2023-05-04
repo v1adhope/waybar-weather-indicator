@@ -127,7 +127,10 @@ func main() {
 		}
 	}
 
-	w.Tooltip = strings.TrimSuffix(b.String(), "\n")
+	fmt.Fprint(&b, "\n<b>Timestamp</b>\n")
+	fmt.Fprint(&b, time.Now().Format(time.DateTime))
+
+	w.Tooltip = b.String()
 
 	json, err := json.Marshal(w)
 	if err != nil {

@@ -9,4 +9,5 @@ test: build
 	./.bin/weather | jq .
 
 prod: build
+	mkdir -p ~/.config/waybar/scripts/
 	\cp -f .bin/weather ~/.config/waybar/scripts/
