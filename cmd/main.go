@@ -80,7 +80,8 @@ func main() {
 	fmt.Fprintf(&b, "Feels like: %s°\n", data.CurrentCondition[0].FeelsLikeC)
 	fmt.Fprintf(&b, "Humidity: %s%%\n", data.CurrentCondition[0].Humidity)
 	fmt.Fprintf(&b, "Pressure: %s hPa\n", data.CurrentCondition[0].Pressure)
-	fmt.Fprintf(&b, "Wind speed: %s Km/h\n\n", data.CurrentCondition[0].WindspeedKmph)
+	fmt.Fprintf(&b, "Wind speed: %s Km/h\n", data.CurrentCondition[0].WindspeedKmph)
+	fmt.Fprintf(&b, "Description: %s \n\n", data.CurrentCondition[0].WeatherDesc[0].Value)
 
 	// Solar block
 	time12H := data.Weather[0].Astronomy[0].SunRise
@@ -120,9 +121,9 @@ func main() {
 			}
 
 			if wttrTime < 10 {
-				fmt.Fprintf(&b, "At 0%d:00 %2s°(%2s°)\n", wttrTime, v.TempC, v.FeelsLikeC)
+				fmt.Fprintf(&b, "At 0%d:00 %2s°(%2s°) %s\n", wttrTime, v.TempC, v.FeelsLikeC, checkDescription(v.WeatherDesc[0].Value))
 			} else {
-				fmt.Fprintf(&b, "At %d:00 %2s°(%2s°)\n", wttrTime, v.TempC, v.FeelsLikeC)
+				fmt.Fprintf(&b, "At %d:00 %2s°(%2s°) %s\n", wttrTime, v.TempC, v.FeelsLikeC, checkDescription(v.WeatherDesc[0].Value))
 			}
 		}
 	}
@@ -138,6 +139,18 @@ func main() {
 	}
 
 	fmt.Print(string(json))
+}
+
+func checkDescription(target string) string {
+	if strings.Contains(strings.ToLower(target), "rain") {
+		return "r"
+	}
+
+	if strings.Contains(strings.ToLower(target), "snow") {
+		return "s"
+	}
+
+	return ""
 }
 
 func timeConvertFrom12to24H(target string) (string, error) {
