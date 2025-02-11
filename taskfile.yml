@@ -1,0 +1,20 @@
+version: '3'
+
+env:
+  BIN_NAME: weather
+
+tasks:
+  build:
+    cmds:
+      - go build -o .bin/{{.BIN_NAME}} cmd/main.go && chmod +x .bin/{{.BIN_NAME}}
+
+  preview:
+    cmds:
+      - task: build
+      - .bin/{{.BIN_NAME}} | jq .
+
+  prod:
+    cmds:
+      - task: build
+      - mkdir -p ~/.config/waybar/scripts/
+      - \cp -f .bin/{{.BIN_NAME}} ~/.config/waybar/scripts

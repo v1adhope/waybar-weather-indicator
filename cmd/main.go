@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -14,131 +15,110 @@ import (
 )
 
 const (
+	_reqAttempts = 10
+
 	_timeModel12h = "03:04 PM"
 	_timeModel24h = "15:04"
 )
 
-// NOTE: Output structure. Read more
-// https://github.com/Alexays/Waybar/wiki/Module:-Custom#return-type
-type waybar struct {
+// Read more https://github.com/Alexays/Waybar/wiki/Module:-Custom#return-type
+type module struct {
 	Text    string `json:"text"`
 	Tooltip string `json:"tooltip"`
 }
 
 func main() {
-	var city = "" // use ip location by default
-
-	if env := os.Getenv("CITY_WEATHER"); env != "" {
-		city = env
-	}
-
-	var (
-		resp *http.Response
-		err  error
-		u    *url.URL
-	)
-
-	u, err = url.Parse(fmt.Sprintf("https://wttr.in/%s?format=j1", city))
+	u, err := url.Parse("https://wttr.in/" + os.Getenv("CITY_WEATHER") + "?format=j1")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("parse: %v", err)
 	}
 
-	//If the server temporarily does not respond
-	for attempts := 5; attempts > 0; attempts-- {
-		resp, err = http.Get(u.String())
-		if attempts == 1 || err == nil {
-			break
+	data := structure.Data{}
+	func() {
+		resp, err := &http.Response{}, error(nil)
+		for range _reqAttempts {
+			resp, err = http.Get(u.String())
+			if resp.StatusCode == 200 {
+				break
+			}
+			time.Sleep(30 * time.Second)
 		}
+		if resp != nil {
+			defer resp.Body.Close()
+		}
+		if err != nil {
+			log.Fatalf("get: %v", err)
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			log.Fatalf("decode: %v", err)
+		}
+	}()
 
-		log.Printf("attempts left: %d", attempts-1)
-		time.Sleep(time.Minute)
-	}
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	var data structure.Data
-	err = json.NewDecoder(resp.Body).Decode(&data)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var (
-		w waybar
-		b strings.Builder
+	module := module{}
+	module.Text = fmt.Sprintf(
+		"%s°(%s°)",
+		data.CurrentCondition[0].TempC,
+		data.CurrentCondition[0].FeelsLikeC,
 	)
 
-	// Current weather block
-	fmt.Fprintf(&b, "%s°", data.CurrentCondition[0].TempC)
-	fmt.Fprintf(&b, "(%s°)", data.CurrentCondition[0].FeelsLikeC)
-	w.Text = b.String()
-	b.Reset()
-
-	fmt.Fprintf(&b, "<b>Weather</b>\n")
-	fmt.Fprintf(&b, "Current temp: %s°\n", data.CurrentCondition[0].TempC)
-	fmt.Fprintf(&b, "Feels like: %s°\n", data.CurrentCondition[0].FeelsLikeC)
-	fmt.Fprintf(&b, "Humidity: %s%%\n", data.CurrentCondition[0].Humidity)
-	fmt.Fprintf(&b, "Pressure: %s hPa\n", data.CurrentCondition[0].Pressure)
-	fmt.Fprintf(&b, "Wind speed: %s Km/h\n", data.CurrentCondition[0].WindspeedKmph)
-	fmt.Fprintf(&b, "Description: %s \n\n", data.CurrentCondition[0].WeatherDesc[0].Value)
-
-	// Solar block
-	time12H := data.Weather[0].Astronomy[0].SunRise
-	sunriseTime, err := timeConvertFrom12to24H(time12H)
-	if err != nil {
-		log.Fatalf("could not convert time: %s", err)
+	buf := bytes.Buffer{}
+	for _, row := range []struct{ Title, Value string }{
+		{"Current temp:", data.CurrentCondition[0].TempC + "°"},
+		{"Feels like:", data.CurrentCondition[0].FeelsLikeC + "°"},
+		{"Humidity:", data.CurrentCondition[0].Humidity + "%"},
+		{"Pressure:", data.CurrentCondition[0].Pressure + "hPa"},
+		{"Wind speed:", data.CurrentCondition[0].WindspeedKmph + "km/h"},
+		{"Description:", data.CurrentCondition[0].WeatherDesc[0].Value},
+	} {
+		fmt.Fprintln(&buf, row.Title+" "+row.Value)
 	}
 
-	time12H = data.Weather[0].Astronomy[0].SunSet
-	sunsetTime, err := timeConvertFrom12to24H(time12H)
+	sunriseTime, err := timeConvertFrom12to24H(data.Weather[0].Astronomy[0].SunRise)
 	if err != nil {
-		log.Fatalf("could not convert time: %s", err)
+		log.Fatalf("sunrise convert: %v", err)
 	}
+	sunsetTime, err := timeConvertFrom12to24H(data.Weather[0].Astronomy[0].SunSet)
+	if err != nil {
+		log.Fatalf("sunset convert: %v", err)
+	}
+	fmt.Fprint(&buf, "\n<b>Solar cycle</b>\n")
+	fmt.Fprintln(&buf, "Sunrise at "+sunriseTime)
+	fmt.Fprintln(&buf, "Sunset at "+sunsetTime)
 
-	fmt.Fprintf(&b, "<b>Solar cycle</b>\n")
-	fmt.Fprintf(&b, "Sunrise at %s\n", sunriseTime)
-	fmt.Fprintf(&b, "Sunset at %s\n", sunsetTime)
-
-	// 3 days weather block
-	weatherDays, hours := 3, time.Now().Hour()
-
-	for i := 0; i < weatherDays; i++ {
-		switch i {
+	days, nowHour := 3, time.Now().Hour()
+	for day := range days {
+		switch day {
 		case 0:
-			fmt.Fprintf(&b, "\n<b>Today</b>\n")
+			fmt.Fprintf(&buf, "\n<b>Today</b>\n")
 		case 1:
-			fmt.Fprintf(&b, "\n<b>Tomorrow</b>\n")
+			fmt.Fprintf(&buf, "\n<b>Tomorrow</b>\n")
 		case 2:
-			fmt.Fprintf(&b, "\n<b>After a day</b>\n")
+			fmt.Fprintf(&buf, "\n<b>After a day</b>\n")
 		}
-
-		for k, v := range data.Weather[i].Hourly {
-			wttrTime := k * 3 // Conversion into hours
-
-			if hours > wttrTime+2 && i == 0 { // Next if the watch is overdue
+		for idx, weather := range data.Weather[day].Hourly {
+			tWindow := idx * 3
+			// Skip if time is overdue
+			if day == 0 && nowHour > tWindow+2 {
 				continue
 			}
-
-			if wttrTime < 10 {
-				fmt.Fprintf(&b, "At 0%d:00 %2s°(%2s°) %s\n", wttrTime, v.TempC, v.FeelsLikeC, checkDescription(v.WeatherDesc[0].Value))
+			if tWindow < 10 {
+				fmt.Fprintf(&buf, "At 0%d:00 %2s°(%2s°) %s\n", tWindow, weather.TempC, weather.FeelsLikeC, checkDescription(weather.WeatherDesc[0].Value))
 			} else {
-				fmt.Fprintf(&b, "At %d:00 %2s°(%2s°) %s\n", wttrTime, v.TempC, v.FeelsLikeC, checkDescription(v.WeatherDesc[0].Value))
+				fmt.Fprintf(&buf, "At %d:00 %2s°(%2s°) %s\n", tWindow, weather.TempC, weather.FeelsLikeC, checkDescription(weather.WeatherDesc[0].Value))
 			}
 		}
 	}
 
-	fmt.Fprint(&b, "\n<b>Timestamp</b>\n")
-	fmt.Fprint(&b, time.Now().Format(time.DateTime))
+	fmt.Fprint(&buf, "\n<b>Timestamp</b>\n")
+	fmt.Fprint(&buf, time.Now().Format(time.DateTime))
 
-	w.Tooltip = b.String()
+	module.Tooltip = buf.String()
 
-	json, err := json.Marshal(w)
+	json, err := json.Marshal(module)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("marshal: %v", err)
 	}
-
-	fmt.Print(string(json))
+	fmt.Println(string(json))
 }
 
 func checkDescription(target string) string {

@@ -1,3 +1,3 @@
 module github.com/v1adhope/waybar-weather-indicator
 
-go 1.20
+go 1.23.6
